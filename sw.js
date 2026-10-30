@@ -3,17 +3,18 @@
    - App shell: precache + cache-first (network-first para HTML)
    - CDN (Supabase SDK, fuentes): stale-while-revalidate
    - API de Supabase: nunca se cachea (datos siempre frescos)
-   Subí la versión cada vez que cambies archivos.
+   Al cambiar archivos: subí VERSION acá y el ?v= de style.css y app.js
+   (acá y en index.html) al mismo número, así HTML y JS nunca se mezclan.
    ========================================================= */
-const VERSION = 'tortalista-v6';
+const VERSION = 'tortalista-v7';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
+  './style.css?v=7',
+  './app.js?v=7',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -52,7 +53,8 @@ self.addEventListener('fetch', (event) => {
   // Navegación (HTML): red primero, caché como respaldo offline
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
+      // no-cache: siempre confirma con el servidor (GitHub Pages pide guardar la página 10 min)
+      fetch(req, { cache: 'no-cache' })
         .then((res) => {
           // Solo se guarda una página buena: un error del servidor no reemplaza la copia offline
           if (res.ok) {
