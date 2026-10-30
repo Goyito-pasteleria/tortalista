@@ -48,7 +48,7 @@
 
       <div id="pending-notice" class="notice notice-warn" hidden></div>
 
-      <form id="form-pedido" class="card form" novalidate>
+      <form id="form-pedido" class="card form" data-tipo="Personalizada" novalidate>
         <fieldset>
           <legend><span class="step">1</span> Tus datos</legend>
           <div class="grid-2">
@@ -79,23 +79,49 @@
 
         <fieldset>
           <legend><span class="step">3</span> Tu torta</legend>
-          <label class="field">
+
+          <!-- Tipo de pedido -->
+          <div class="segmented" id="tipo-torta" data-active="Personalizada" role="radiogroup" aria-label="Tipo de torta">
+            <label><input type="radio" name="tipo" value="Personalizada" checked /><span>🎨 Personalizada</span></label>
+            <label><input type="radio" name="tipo" value="Lista" /><span>🍰 Tortas listas</span></label>
+          </div>
+
+          <!-- Tortas listas (catálogo) -->
+          <div class="field solo-lista">
+            <span>Elegí tu torta *</span>
+            <div class="catalogo" id="catalogo" role="radiogroup"></div>
+          </div>
+
+          <!-- Torta personalizada -->
+          <label class="field solo-personalizada">
             <span>Temática / diseño *</span>
-            <textarea name="tematica" rows="3" maxlength="500" placeholder="Ej.: Cumple de 5 años, temática dinosaurios, tonos verdes y nombre «Tomi»" required></textarea>
+            <textarea name="tematica" rows="3" maxlength="500" placeholder="Ej.: Cumple de 5 años, temática dinosaurios, tonos verdes y nombre «Tomi»"></textarea>
           </label>
 
-          <div class="field">
-            <span>Sabor del bizcochuelo *</span>
-            <div class="chips" role="radiogroup">
-              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Vainilla" required /><span>Vainilla</span></label>
-              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Chocolate" /><span>Chocolate</span></label>
-              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Marmolado" /><span>Marmolado</span></label>
-              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Red velvet" /><span>Red velvet</span></label>
+          <div class="field solo-personalizada">
+            <span>Imagen de ejemplo <small>(opcional)</small></span>
+            <input id="imagen" type="file" accept="image/*" class="visually-hidden" />
+            <label for="imagen" class="upload" id="upload-zona">
+              <span class="upload-icon" aria-hidden="true">📷</span>
+              <span><strong>Subí una foto</strong> de una torta parecida a la que querés</span>
+              <small>JPG o PNG · se achica automáticamente</small>
+            </label>
+            <div class="upload-preview" id="upload-preview" hidden>
+              <img id="upload-img" alt="Vista previa de la imagen de ejemplo" />
+              <button type="button" class="btn btn-sm btn-ghost" id="upload-quitar">Quitar imagen</button>
             </div>
           </div>
 
-          <div class="field">
-            <span>Rellenos * <small>(podés elegir varios)</small></span>
+          <div class="field solo-personalizada">
+            <span>Sabor del bizcochuelo *</span>
+            <div class="chips" role="radiogroup">
+              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Vainilla" /><span>Vainilla</span></label>
+              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Chocolate" /><span>Chocolate</span></label>
+            </div>
+          </div>
+
+          <div class="field solo-personalizada">
+            <span>Rellenos * <small id="rellenos-contador">(hasta 3)</small></span>
             <div class="chips" id="rellenos">
               <label class="chip"><input type="checkbox" name="rellenos" value="Dulce de leche" /><span>Dulce de leche</span></label>
               <label class="chip"><input type="checkbox" name="rellenos" value="Crema chantilly" /><span>Crema chantilly</span></label>
@@ -118,20 +144,23 @@
               <option>Más de 2 kg (a consultar)</option>
             </select>
           </label>
+
+          <label class="field solo-lista">
+            <span>Comentarios <small>(opcional)</small></span>
+            <textarea name="comentarios" rows="2" maxlength="300" placeholder="Ej.: Escribir «Feliz cumple Sofi» en la torta"></textarea>
+          </label>
         </fieldset>
 
         <fieldset>
-          <legend><span class="step">4</span> Pago</legend>
-          <div class="grid-2">
-            <label class="field">
-              <span>Precio total ($) *</span>
-              <input name="precio_total" type="number" inputmode="decimal" min="0" step="0.01" required />
-            </label>
-            <label class="field">
-              <span>Seña abonada ($)</span>
-              <input name="sena" type="number" inputmode="decimal" min="0" step="0.01" value="0" />
-            </label>
+          <legend><span class="step">4</span> Seña para confirmar</legend>
+          <div class="aviso-sena">
+            <span aria-hidden="true">💰</span>
+            <p>Para que <strong>Goyito Pastelería</strong> confirme tu pedido y lo pueda realizar, es necesario abonar una <strong>seña</strong>. Hasta recibirla, el pedido queda pendiente de confirmación.</p>
           </div>
+          <label class="field">
+            <span>Seña ($)</span>
+            <input name="sena" type="number" inputmode="decimal" min="0" step="0.01" value="0" />
+          </label>
           <div class="field">
             <span>Medio de la seña</span>
             <div class="chips">
@@ -140,7 +169,7 @@
               <label class="chip"><input type="radio" name="sena_medio" value="Transferencia" /><span>Transferencia</span></label>
             </div>
           </div>
-          <p class="saldo">Saldo a pagar al retirar: <strong id="saldo">$0</strong></p>
+          <p class="saldo">El precio final te lo confirma Goyito Pastelería por WhatsApp.</p>
         </fieldset>
 
         <p id="form-error" class="form-error" role="alert" hidden></p>
@@ -156,6 +185,7 @@
         </div>
         <h2>¡Pedido recibido!</h2>
         <p id="pedido-ok-texto">Te vamos a contactar para confirmarlo.</p>
+        <p class="ok-sena">Recordá que Goyito Pastelería confirma el pedido cuando recibe la seña.</p>
         <button class="btn btn-ghost" id="btn-nuevo">Hacer otro pedido</button>
       </div>
     </section>
@@ -224,7 +254,7 @@
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
   <!-- Supabase SDK v2 (expone window.supabase) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
   <script src="./app.js"></script>
 </body>
 </html>

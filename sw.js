@@ -5,7 +5,7 @@
    - API de Supabase: nunca se cachea (datos siempre frescos)
    Subí la versión cada vez que cambies archivos.
    ========================================================= */
-const VERSION = 'tortalista-v3';
+const VERSION = 'tortalista-v6';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -54,8 +54,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copia = res.clone();
-          caches.open(STATIC_CACHE).then((c) => c.put('./index.html', copia));
+          // Solo se guarda una página buena: un error del servidor no reemplaza la copia offline
+          if (res.ok) {
+            const copia = res.clone();
+            caches.open(STATIC_CACHE).then((c) => c.put('./index.html', copia));
+          }
           return res;
         })
         .catch(() => caches.match('./index.html'))

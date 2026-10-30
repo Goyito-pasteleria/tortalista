@@ -1,6 +1,7 @@
 -- =========================================================
 -- TortaLista · Esquema y seguridad (pegar en Supabase → SQL Editor → Run)
 -- =========================================================
+-- IMPORTANTE: en una instalación nueva, después de este archivo ejecutá también supabase-actualizacion.sql
 
 -- 1) Tabla de pedidos
 create table if not exists public.pedidos_tortas (
@@ -65,7 +66,16 @@ create policy "ver_mi_rol" on public.administradores
   for select to authenticated using (user_id = auth.uid());
 
 -- 4) Tiempo real (el panel recibe los pedidos nuevos al instante)
-alter publication supabase_realtime add table public.pedidos_tortas;
+-- (se puede ejecutar varias veces sin error)
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'pedidos_tortas'
+  ) then
+    alter publication supabase_realtime add table public.pedidos_tortas;
+  end if;
+end $$;
 
 -- =========================================================
 -- 5) DAR DE ALTA AL ADMINISTRADOR (después de crear el usuario en

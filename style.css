@@ -178,6 +178,93 @@ input:focus, select:focus, textarea:focus {
 .chip input:checked + span { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
 .chip input:focus-visible + span { box-shadow: 0 0 0 4px var(--primary-soft); }
 
+.chip input:disabled + span { opacity: .4; cursor: not-allowed; }
+.chip:has(input:disabled) { cursor: not-allowed; }
+.chip:active:has(input:disabled) span { transform: none; }
+
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; min-height: 0;
+}
+
+/* Mostrar/ocultar según el tipo de torta */
+form[data-tipo="Personalizada"] .solo-lista,
+form[data-tipo="Lista"] .solo-personalizada { display: none; }
+
+/* Selector Personalizada / Tortas listas (indicador que se desliza) */
+.segmented {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--bg-2); padding: 4px; border-radius: 999px; margin-bottom: 1.1rem;
+}
+.segmented::before {
+  content: ""; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px);
+  background: var(--surface); border-radius: 999px; box-shadow: var(--shadow);
+  transition: transform var(--dur-ui) var(--ease-in-out);
+}
+.segmented[data-active="Lista"]::before { transform: translateX(100%); }
+.segmented label { position: relative; z-index: 1; cursor: pointer; }
+.segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }
+.segmented span {
+  display: flex; align-items: center; justify-content: center; min-height: 44px;
+  font-weight: 800; font-size: .95rem; color: var(--ink-soft); border-radius: 999px;
+  transition: color var(--dur-ui) ease;
+}
+.segmented input:checked + span { color: var(--primary); }
+.segmented input:focus-visible + span { box-shadow: 0 0 0 4px var(--primary-soft); }
+
+/* Catálogo de tortas listas */
+.catalogo { display: grid; grid-template-columns: 1fr; gap: .75rem; }
+.catalogo.invalid { border-radius: var(--radius); padding: .4rem; }
+.torta { position: relative; cursor: pointer; display: block; }
+.torta input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }
+.torta-card {
+  display: grid; grid-template-columns: 84px 1fr; gap: .9rem; align-items: center;
+  padding: .7rem; border: 2px solid var(--line); border-radius: var(--radius); background: #FFFCF8;
+  transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+.torta:active .torta-card { transform: scale(0.98); }
+.torta input:checked + .torta-card { border-color: var(--primary); background: var(--primary-soft); }
+.torta input:focus-visible + .torta-card { box-shadow: 0 0 0 4px var(--primary-soft); }
+.torta-foto {
+  width: 84px; height: 84px; border-radius: 12px; display: grid; place-items: center;
+  font-size: 2.4rem; overflow: hidden; background: var(--bg-2);
+}
+.torta-foto img { width: 100%; height: 100%; object-fit: cover; }
+.torta-nombre { font-weight: 800; color: var(--cocoa); margin: 0; }
+.torta-desc { font-size: .88rem; color: var(--ink-soft); margin: .1rem 0 0; }
+.torta-precio { font-weight: 800; color: var(--primary); font-size: .9rem; margin: .25rem 0 0; font-variant-numeric: tabular-nums; }
+.torta-check {
+  position: absolute; top: .55rem; right: .55rem; width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--primary); color: #fff; font-size: .8rem; font-weight: 800;
+  opacity: 0; transform: scale(0.8);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.torta input:checked ~ .torta-check { opacity: 1; transform: none; }
+
+/* Subir imagen */
+.upload {
+  display: flex; flex-direction: column; align-items: center; gap: .25rem; text-align: center;
+  padding: 1.1rem; border: 2px dashed var(--line); border-radius: var(--radius); background: #FFFCF8;
+  cursor: pointer; color: var(--ink-soft);
+  transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) ease;
+}
+.upload:active { transform: scale(0.98); }
+.upload strong { color: var(--primary); }
+.upload-icon { font-size: 1.6rem; }
+#imagen:focus-visible + .upload { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
+.upload-preview { display: flex; align-items: center; gap: .9rem; animation: pop var(--dur-ui) var(--ease-out) both; }
+.upload-preview img { width: 96px; height: 96px; object-fit: cover; border-radius: 12px; border: 1px solid var(--line); flex-shrink: 0; }
+
+/* Aviso de la seña */
+.aviso-sena {
+  display: flex; gap: .7rem; align-items: flex-start;
+  padding: .85rem 1rem; margin-bottom: 1rem; border-radius: var(--radius-sm);
+  background: var(--warn-soft); color: #6B4A10; border: 1px solid #F3DDB3;
+}
+.aviso-sena span { font-size: 1.3rem; line-height: 1.3; }
+.aviso-sena p { margin: 0; font-size: .92rem; }
+.ok-sena { font-size: .9rem; font-weight: 700; color: #7A5212 !important; background: var(--warn-soft); padding: .6rem .8rem; border-radius: var(--radius-sm); }
+
 .saldo { margin: 0; padding: .75rem 1rem; background: var(--bg-2); border-radius: var(--radius-sm); }
 .saldo strong { color: var(--cocoa); }
 
@@ -301,6 +388,15 @@ input:focus, select:focus, textarea:focus {
 .pedido-fecha small { display: block; font-weight: 600; }
 .tag-urgente { display: inline-block; background: var(--primary); color: #fff; font-size: .72rem; font-weight: 800; padding: .1rem .5rem; border-radius: 999px; margin-top: .2rem; }
 
+.tag-tipo { align-self: flex-start; display: inline-block; font-size: .75rem; font-weight: 800; padding: .15rem .6rem; border-radius: 999px; background: var(--primary-soft); color: var(--primary); }
+.pedido-img {
+  display: block; width: 100%; padding: 0; border: 0; cursor: zoom-in; border-radius: var(--radius-sm); overflow: hidden;
+  background: var(--bg-2); aspect-ratio: 16 / 10;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.pedido-img:active { transform: scale(0.98); }
+.pedido-img img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 200ms ease; }
+.pedido-img img.cargada { opacity: 1; }
 .pedido-tema { margin: 0; background: var(--bg); padding: .6rem .8rem; border-radius: var(--radius-sm); white-space: pre-wrap; word-break: break-word; }
 .pedido-detalles { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem .75rem; font-size: .9rem; margin: 0; }
 .pedido-detalles dt { color: var(--ink-soft); font-weight: 600; }
@@ -349,6 +445,9 @@ input:focus, select:focus, textarea:focus {
   .grid-2 { grid-template-columns: 1fr 1fr; }
   .form { padding: 1.75rem 2rem; }
   .stats { grid-template-columns: repeat(4, 1fr); }
+  .catalogo { grid-template-columns: repeat(3, 1fr); }
+  .torta-card { grid-template-columns: 1fr; text-align: center; padding: .8rem .8rem 1rem; }
+  .torta-foto { width: 100%; height: 120px; font-size: 3rem; }
   .filters { grid-template-columns: 2fr 1fr 1fr; }
   .pedidos { grid-template-columns: repeat(2, 1fr); }
   .toasts { left: auto; right: 24px; align-items: flex-end; }
@@ -361,7 +460,8 @@ input:focus, select:focus, textarea:focus {
    se mantienen los fundidos de opacidad, se quitan desplazamientos y escalas */
 @media (prefers-reduced-motion: reduce) {
   :root { --enter-y: 0px; --enter-scale: 1; --toast-y: 0; }
-  .topnav::before { transition: none; }
+  .topnav::before, .segmented::before { transition: none; }
+  .torta:active .torta-card, .upload:active, .pedido-img:active { transform: none; }
   .btn:active:not(:disabled), .chip:active span, .stat:active { transform: none; }
   .skeleton { animation: none; }
   .success-icon path { animation: none; stroke-dashoffset: 0; }

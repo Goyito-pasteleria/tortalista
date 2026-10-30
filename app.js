@@ -12,8 +12,48 @@ const SUPABASE_URL = 'https://naewanjjdevhsstenjja.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_hAMx8mm97WgxtbElb1HtIw_Err6Kxbz';
 
 const TABLA = 'pedidos_tortas';
+const BUCKET = 'referencias';                     // fotos de ejemplo (privado)
 const COLA_KEY = 'tortalista_pedidos_pendientes'; // respaldo local
 const ESTADOS = ['Pendiente', 'En Proceso', 'Entregado'];
+const MAX_RELLENOS = 3;
+
+/* ---------- Tortas listas (catálogo) ----------
+   Para cambiar el catálogo, editá esta lista:
+   - precio: número (ej. 28000) para mostrar "Desde $..." como referencia, o null para no mostrarlo
+     (el precio final siempre lo define la pastelería)
+   - imagen: ruta de una foto (ej. './img/oreo.jpg') o null para usar el emoji */
+const TORTAS_LISTAS = [
+  {
+    id: 'oreo',
+    nombre: 'Torta Oreo',
+    descripcion: 'Bizcochuelo de chocolate, crema y galletitas Oreo.',
+    sabor: 'Chocolate',
+    rellenos: ['Crema', 'Oreo'],
+    emoji: '🍪',
+    precio: null,
+    imagen: null,
+  },
+  {
+    id: 'selva-negra',
+    nombre: 'Selva Negra',
+    descripcion: 'Chocolate, crema chantilly y cerezas.',
+    sabor: 'Chocolate',
+    rellenos: ['Crema chantilly', 'Cerezas'],
+    emoji: '🍒',
+    precio: null,
+    imagen: null,
+  },
+  {
+    id: 'frutilla',
+    nombre: 'Torta de frutilla',
+    descripcion: 'Vainilla, crema chantilly y frutillas frescas.',
+    sabor: 'Vainilla',
+    rellenos: ['Crema chantilly', 'Frutillas'],
+    emoji: '🍓',
+    precio: null,
+    imagen: null,
+  },
+];
 
 /* ---------- 2. Cliente Supabase (defensivo) ---------- */
 const configurado = !SUPABASE_URL.includes('TU-PROYECTO') && !SUPABASE_ANON_KEY.includes('TU-ANON');
@@ -138,10 +178,21 @@ function guardarCola(cola) {
     return false;
   }
 }
-function encolar(pedido) {
-  const cola = leerCola();
-  if (!cola.some((p) => p.id === pedido.id)) cola.push(pedido);
-  return guardarCola(cola);
+/** Normaliza un elemento de la cola: { pedido, imagen (dataURL | null) } */
+const itemCola = (x) => (x && x.pedido ? x : { pedido: x, imagen: null });
+
+/** Guarda el pedido (y su foto comprimida) en el dispositivo. Devuelve 'ok', 'sin-imagen' o false. */
+function encolar(pedido, imagenDataUrl = null) {
+  const cola = leerCola().map(itemCola);
+  if (cola.some((x) => x.pedido.id === pedido.id)) return 'ok';
+  cola.push({ pedido, imagen: imagenDataUrl });
+  if (guardarCola(cola)) return 'ok';
+  // Si la foto no entra en el almacenamiento, se guarda el pedido sin ella
+  if (imagenDataUrl) {
+    cola[cola.length - 1].imagen = null;
+    if (guardarCola(cola)) return 'sin-imagen';
+  }
+  return false;
 }
 function actualizarAvisoCola() {
   const n = leerCola().length;
@@ -154,26 +205,44 @@ function actualizarAvisoCola() {
 async function insertarPedido(pedido) {
   if (!sb) throw new Error('network: Supabase no disponible');
   // Sin .select(): el cliente anónimo solo tiene permiso de INSERT.
-  const { error } = await sb.from(TABLA).insert(pedido);
+  // precio_total va siempre vacío (también en pedidos viejos guardados sin conexión).
+  const { error } = await sb.from(TABLA).insert({ ...pedido, precio_total: null });
   // 23505 = clave duplicada → ya se había enviado en un intento previo.
   if (error && error.code !== '23505') throw error;
+}
+
+/** Sube la foto de ejemplo al bucket privado. Devuelve la ruta guardada. */
+async function subirImagen(pedidoId, blob) {
+  if (!sb) throw new Error('network: Supabase no disponible');
+  const ruta = `${pedidoId}/referencia.jpg`;
+  const { error } = await sb.storage.from(BUCKET).upload(ruta, blob, { contentType: 'image/jpeg', upsert: false });
+  // "Ya existe" → se había subido en un intento previo
+  if (error && !/exist|duplicate/i.test(error.message || '') && String(error.statusCode) !== '409') throw error;
+  return ruta;
+}
+
+/** Envía un pedido completo: primero la foto (si hay) y después los datos. */
+async function enviarPedidoCompleto(pedido, blob) {
+  if (blob) pedido.imagen_path = await subirImagen(pedido.id, blob);
+  await insertarPedido(pedido);
 }
 
 let sincronizando = false;
 async function sincronizarCola() {
   if (sincronizando || !navigator.onLine || !sb) return;
-  const cola = leerCola();
+  const cola = leerCola().map(itemCola);
   if (!cola.length) return;
   sincronizando = true;
   const restantes = [];
   let enviados = 0;
-  for (const pedido of cola) {
+  for (const item of cola) {
     try {
-      await insertarPedido(pedido);
+      const blob = item.imagen ? await (await fetch(item.imagen)).blob() : null;
+      await enviarPedidoCompleto(item.pedido, blob);
       enviados++;
     } catch (err) {
       console.warn('Pedido sin sincronizar:', err);
-      restantes.push(pedido);
+      restantes.push(item);
     }
   }
   guardarCola(restantes);
@@ -190,15 +259,117 @@ function prepararFormulario() {
   const iso = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   form.fecha.min = iso;
 
-  const calcularSaldo = () => {
-    const saldo = (Number(form.precio_total.value) || 0) - (Number(form.sena.value) || 0);
-    $('#saldo').textContent = dinero(Math.max(saldo, 0));
-  };
-  form.precio_total.addEventListener('input', calcularSaldo);
-  form.sena.addEventListener('input', calcularSaldo);
   form.addEventListener('input', (e) => e.target.classList?.remove('invalid'));
-  form.addEventListener('change', (e) => e.target.closest('.chips')?.classList.remove('invalid'));
+  form.addEventListener('change', (e) => e.target.closest('.chips, .catalogo')?.classList.remove('invalid'));
+
+  renderCatalogo();
+
+  // Personalizada / Tortas listas
+  $$('[name=tipo]', form).forEach((r) => r.addEventListener('change', () => cambiarTipo(r.value)));
+
+  // Rellenos: máximo 3
+  $('#rellenos').addEventListener('change', limitarRellenos);
+
+  // Imagen de ejemplo
+  $('#imagen').addEventListener('change', alElegirImagen);
+  $('#upload-quitar').addEventListener('click', quitarImagen);
 }
+
+function renderCatalogo() {
+  $('#catalogo').innerHTML = TORTAS_LISTAS.map((t) => `
+    <label class="torta">
+      <input type="radio" name="torta_lista" value="${esc(t.id)}" />
+      <div class="torta-card">
+        <div class="torta-foto">${t.imagen ? `<img src="${esc(t.imagen)}" alt="${esc(t.nombre)}" loading="lazy" />` : `<span aria-hidden="true">${t.emoji}</span>`}</div>
+        <div>
+          <p class="torta-nombre">${esc(t.nombre)}</p>
+          <p class="torta-desc">${esc(t.descripcion)}</p>
+          ${t.precio ? `<p class="torta-precio">Desde ${dinero(t.precio)}</p>` : ''}
+        </div>
+      </div>
+      <span class="torta-check" aria-hidden="true">✓</span>
+    </label>`).join('');
+}
+
+function cambiarTipo(tipo) {
+  form.dataset.tipo = tipo;
+  $('#tipo-torta').dataset.active = tipo;
+  $$('.invalid', form).forEach((el) => el.classList.remove('invalid'));
+  $('#form-error').hidden = true;
+}
+
+function limitarRellenos() {
+  const todos = $$('[name=rellenos]', form);
+  const elegidos = todos.filter((c) => c.checked).length;
+  todos.forEach((c) => (c.disabled = !c.checked && elegidos >= MAX_RELLENOS));
+  $('#rellenos-contador').textContent =
+    elegidos >= MAX_RELLENOS ? `(${MAX_RELLENOS} de ${MAX_RELLENOS} · máximo alcanzado)` : `(hasta ${MAX_RELLENOS} · elegiste ${elegidos})`;
+}
+
+/* ---------- Imagen de ejemplo ---------- */
+let imagenBlob = null;
+let imagenUrl = null;
+
+/** Achica la foto (máx. 1600 px) y la convierte a JPEG para que suba rápido. */
+async function comprimirImagen(file, maxLado = 1600, calidad = 0.82) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, mal) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => mal(new Error('formato'));
+      i.src = url;
+    });
+    const escala = Math.min(1, maxLado / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.naturalWidth * escala);
+    canvas.height = Math.round(img.naturalHeight * escala);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; // fondo blanco para PNG transparentes
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', calidad));
+    if (!blob) throw new Error('formato');
+    return blob;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function alElegirImagen(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    if (!file.type.startsWith('image/')) throw new Error('formato');
+    if (file.size > 25 * 1024 * 1024) throw new Error('grande');
+    imagenBlob = await comprimirImagen(file);
+    if (imagenUrl) URL.revokeObjectURL(imagenUrl);
+    imagenUrl = URL.createObjectURL(imagenBlob);
+    $('#upload-img').src = imagenUrl;
+    $('#upload-zona').hidden = true;
+    $('#upload-preview').hidden = false;
+  } catch (err) {
+    quitarImagen();
+    toast(err.message === 'grande' ? 'La imagen es demasiado grande.' : 'No se pudo leer esa imagen. Probá con una foto JPG o PNG.', 'error');
+  }
+}
+
+function quitarImagen() {
+  imagenBlob = null;
+  if (imagenUrl) URL.revokeObjectURL(imagenUrl);
+  imagenUrl = null;
+  $('#imagen').value = '';
+  $('#upload-preview').hidden = true;
+  $('#upload-zona').hidden = false;
+}
+
+const blobADataUrl = (blob) =>
+  new Promise((ok, mal) => {
+    const r = new FileReader();
+    r.onload = () => ok(r.result);
+    r.onerror = mal;
+    r.readAsDataURL(blob);
+  });
 
 function validarPedido() {
   const f = form;
@@ -213,31 +384,39 @@ function validarPedido() {
   if (!f.hora.value) marcar(f.hora, 'Elegí la hora de entrega.');
   if (f.fecha.value && f.hora.value && new Date(`${f.fecha.value}T${f.hora.value}`) < new Date())
     marcar(f.fecha, 'La fecha de entrega ya pasó.');
-  if (f.tematica.value.trim().length < 3) marcar(f.tematica, 'Contanos la temática o el diseño.');
-  if (!f.querySelector('[name=sabor_bizcocho]:checked'))
-    marcar(f.querySelector('[name=sabor_bizcocho]').closest('.chips'), 'Elegí el sabor del bizcochuelo.');
-  if (!f.querySelector('[name=rellenos]:checked')) marcar($('#rellenos'), 'Elegí al menos un relleno.');
+  if (f.dataset.tipo === 'Lista') {
+    if (!f.querySelector('[name=torta_lista]:checked')) marcar($('#catalogo'), 'Elegí una de las tortas listas.');
+  } else {
+    if (f.tematica.value.trim().length < 3) marcar(f.tematica, 'Contanos la temática o el diseño.');
+    if (!f.querySelector('[name=sabor_bizcocho]:checked'))
+      marcar(f.querySelector('[name=sabor_bizcocho]').closest('.chips'), 'Elegí el sabor del bizcochuelo.');
+    const nRellenos = $$('[name=rellenos]:checked', f).length;
+    if (nRellenos === 0) marcar($('#rellenos'), 'Elegí al menos un relleno.');
+    if (nRellenos > MAX_RELLENOS) marcar($('#rellenos'), `Podés elegir hasta ${MAX_RELLENOS} rellenos.`);
+  }
   if (!f.peso_porciones.value) marcar(f.peso_porciones, 'Elegí el tamaño.');
-  const precio = Number(f.precio_total.value);
-  const sena = Number(f.sena.value || 0);
-  if (!(precio > 0)) marcar(f.precio_total, 'Ingresá el precio total.');
-  if (sena < 0 || sena > precio) marcar(f.sena, 'La seña no puede superar el precio total.');
+  if (Number(f.sena.value || 0) < 0) marcar(f.sena, 'La seña no puede ser negativa.');
 
   return errores;
 }
 
 function leerPedido() {
   const f = form;
+  const esLista = f.dataset.tipo === 'Lista';
+  const torta = esLista ? TORTAS_LISTAS.find((t) => t.id === f.querySelector('[name=torta_lista]:checked').value) : null;
   return {
     id: uuid(), // generado en el cliente → permite reintentos sin duplicar
+    tipo: esLista ? 'Lista' : 'Personalizada',
+    torta_lista: torta ? torta.nombre : null,
     cliente_nombre: f.cliente_nombre.value.trim(),
     cliente_telefono: f.cliente_telefono.value.trim(),
     fecha_entrega: new Date(`${f.fecha.value}T${f.hora.value}`).toISOString(),
-    tematica: f.tematica.value.trim(),
-    sabor_bizcocho: f.querySelector('[name=sabor_bizcocho]:checked').value,
-    rellenos: $$('[name=rellenos]:checked', f).map((c) => c.value),
+    tematica: esLista ? null : f.tematica.value.trim(),
+    comentarios: esLista ? f.comentarios.value.trim() || null : null,
+    sabor_bizcocho: torta ? torta.sabor : f.querySelector('[name=sabor_bizcocho]:checked').value,
+    rellenos: torta ? torta.rellenos : $$('[name=rellenos]:checked', f).map((c) => c.value),
     peso_porciones: f.peso_porciones.value,
-    precio_total: Number(f.precio_total.value),
+    precio_total: null, // lo define la pastelería, nunca el cliente
     sena: Number(f.sena.value || 0),
     sena_medio: f.querySelector('[name=sena_medio]:checked')?.value || 'Efectivo',
     estado: 'Pendiente',
@@ -268,18 +447,24 @@ form.addEventListener('submit', async (e) => {
   btn.disabled = true;
   setLabel(btn, 'Enviando…');
   const pedido = leerPedido();
+  // La foto solo aplica a tortas personalizadas
+  const blob = pedido.tipo === 'Personalizada' ? imagenBlob : null;
 
   try {
-    await insertarPedido(pedido);
+    await enviarPedidoCompleto(pedido, blob);
     mostrarExito('Ya lo recibimos. Te vamos a escribir por WhatsApp para confirmarlo.');
     toast('✓ Pedido enviado', 'ok');
   } catch (err) {
     if (esErrorDeRed(err)) {
       // Respaldo automático: no se pierde el pedido
-      if (encolar(pedido)) {
+      delete pedido.imagen_path; // se vuelve a subir al sincronizar
+      let dataUrl = null;
+      try { if (blob) dataUrl = await blobADataUrl(blob); } catch { dataUrl = null; }
+      const guardado = encolar(pedido, dataUrl);
+      if (guardado) {
         actualizarAvisoCola();
         mostrarExito('No hay conexión en este momento. Guardamos tu pedido en este dispositivo y se enviará solo apenas vuelva internet. No cierres ni borres los datos del navegador.');
-        toast('Sin conexión: pedido guardado en el dispositivo', 'warn', 6000);
+        toast(guardado === 'sin-imagen' ? 'Sin conexión: pedido guardado (sin la imagen, por espacio)' : 'Sin conexión: pedido guardado en el dispositivo', 'warn', 6000);
       } else {
         errorEl.textContent = 'No hay conexión y no se pudo guardar el pedido en el dispositivo. Intentá de nuevo en unos minutos.';
         errorEl.hidden = false;
@@ -298,7 +483,9 @@ form.addEventListener('submit', async (e) => {
 
 $('#btn-nuevo').addEventListener('click', () => {
   form.reset();
-  $('#saldo').textContent = dinero(0);
+  quitarImagen();
+  cambiarTipo('Personalizada');
+  limitarRellenos();
   $('#pedido-ok').hidden = true;
   form.hidden = false;
 });
@@ -384,9 +571,13 @@ async function cargarPedidos() {
   if (!pedidos.length) lista.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
 
   try {
+    // Solo lo que sirve en el panel: todo lo no entregado + lo entregado en los últimos 60 días.
+    // Así el historial viejo nunca deja afuera a los pedidos futuros.
+    const desde = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
     const { data, error } = await sb
       .from(TABLA)
       .select('*')
+      .or(`estado.neq.Entregado,fecha_entrega.gte.${desde}`)
       .order('fecha_entrega', { ascending: true })
       .limit(1000);
     if (error) throw error;
@@ -476,7 +667,7 @@ function render() {
   const visibles = (soloUrgentes ? pedidos.filter(esUrgente) : porFecha).filter((p) => {
     if (estado && p.estado !== estado) return false;
     if (!texto) return true;
-    return [p.cliente_nombre, p.cliente_telefono, p.tematica].some((v) => String(v || '').toLowerCase().includes(texto));
+    return [p.cliente_nombre, p.cliente_telefono, p.tematica, p.torta_lista, p.comentarios].some((v) => String(v || '').toLowerCase().includes(texto));
   });
 
   $('#lista-vacia').hidden = visibles.length > 0;
@@ -485,15 +676,63 @@ function render() {
   animarEntrada = false;
   lista.innerHTML = visibles.map(tarjeta).join('');
   recienLlegados.clear();
+  cargarMiniaturas();
+}
+
+/* ---------- Fotos de ejemplo en el panel (URLs firmadas, el bucket es privado) ---------- */
+const urlsFirmadas = new Map(); // ruta → { url, vence }
+
+async function cargarMiniaturas() {
+  const botones = $$('.pedido-img[data-ruta]');
+  if (!botones.length || !sb) return;
+  const ahora = Date.now();
+  const faltan = [...new Set(botones.map((b) => b.dataset.ruta))].filter((r) => !(urlsFirmadas.get(r)?.vence > ahora));
+  if (faltan.length) {
+    try {
+      const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(faltan, 3600);
+      if (error) throw error;
+      (data || []).forEach((d) => {
+        if (d.signedUrl) urlsFirmadas.set(d.path, { url: d.signedUrl, vence: ahora + 55 * 60 * 1000 });
+      });
+    } catch (err) {
+      console.error('No se pudieron cargar las imágenes:', err);
+    }
+  }
+  botones.forEach((b) => {
+    const url = urlsFirmadas.get(b.dataset.ruta)?.url;
+    const img = b.querySelector('img');
+    if (url && img && !img.src) {
+      img.onload = () => img.classList.add('cargada');
+      img.src = url;
+    }
+  });
+}
+
+async function quitarImagenDeStorage(ruta) {
+  if (!ruta) return;
+  try {
+    const { error } = await sb.storage.from(BUCKET).remove([ruta]);
+    if (error) throw error;
+    urlsFirmadas.delete(ruta);
+  } catch (err) {
+    console.warn('No se pudo borrar la imagen (no afecta al pedido):', err);
+  }
+}
+
+/** Arma el número para wa.me: los números locales de Argentina necesitan el prefijo 549. */
+function numeroWhatsApp(telefono) {
+  const n = String(telefono || '').replace(/\D/g, '').replace(/^0/, '');
+  return n.length <= 10 ? '549' + n : n;
 }
 
 function tarjeta(p, i = 0) {
   const { dia, hora } = fmtFecha(p.fecha_entrega);
-  const saldo = Math.max((Number(p.precio_total) || 0) - (Number(p.sena) || 0), 0);
+  const conPrecio = p.precio_total != null;
+  const saldo = conPrecio ? Math.max(Number(p.precio_total) - (Number(p.sena) || 0), 0) : null;
   const atrasado = p.estado !== 'Entregado' && new Date(p.fecha_entrega) < new Date();
   const urgente = esUrgente(p);
   const claseEstado = 'est-' + String(p.estado).replace(/\s/g, '');
-  const tel = String(p.cliente_telefono || '').replace(/\D/g, '');
+  const tel = numeroWhatsApp(p.cliente_telefono);
   const rellenos = Array.isArray(p.rellenos) ? p.rellenos.join(', ') : p.rellenos;
 
   return `
@@ -508,16 +747,18 @@ function tarjeta(p, i = 0) {
         ${atrasado ? '<span class="tag-urgente">ATRASADO</span>' : urgente ? '<span class="tag-urgente">PRÓXIMO</span>' : ''}
       </div>
     </div>
-    <p class="pedido-tema">${esc(p.tematica)}</p>
+    ${p.tipo === 'Lista' ? `<span class="tag-tipo">🍰 Torta lista · ${esc(p.torta_lista)}</span>` : `<span class="tag-tipo">🎨 Personalizada</span>`}
+    ${p.imagen_path ? `<button type="button" class="pedido-img" data-ruta="${esc(p.imagen_path)}" aria-label="Ver imagen de ejemplo en grande"><img alt="Imagen de ejemplo de ${esc(p.cliente_nombre)}" /></button>` : ''}
+    ${p.tematica || p.comentarios ? `<p class="pedido-tema">${esc(p.tematica || p.comentarios)}</p>` : ''}
     <dl class="pedido-detalles">
       <dt>Bizcochuelo</dt><dd>${esc(p.sabor_bizcocho)}</dd>
       <dt>Tamaño</dt><dd>${esc(p.peso_porciones)}</dd>
       <dt>Rellenos</dt><dd>${esc(rellenos)}</dd>
     </dl>
     <div class="pedido-pago">
-      <span class="pill">Total ${dinero(p.precio_total)}</span>
+      <span class="pill">${conPrecio ? 'Total ' + dinero(p.precio_total) : 'Precio a definir'}</span>
       <span class="pill">Seña ${dinero(p.sena)} · ${esc(p.sena_medio || '—')}</span>
-      <span class="pill ${saldo ? 'pill-saldo' : 'pill-ok'}">${saldo ? 'Saldo ' + dinero(saldo) : 'Pagado'}</span>
+      ${conPrecio ? `<span class="pill ${saldo ? 'pill-saldo' : 'pill-ok'}">${saldo ? 'Saldo ' + dinero(saldo) : 'Pagado'}</span>` : ''}
     </div>
     <div class="pedido-acciones">
       <select class="sel-estado sel-${claseEstado.slice(4)}" data-accion="estado" aria-label="Estado del pedido">
@@ -561,6 +802,7 @@ async function borrarPedido(id) {
     pedidos = pedidos.filter((x) => x.id !== id);
     render();
     toast('Pedido eliminado', 'ok', 2500);
+    quitarImagenDeStorage(p?.imagen_path);
   } catch (err) {
     console.error('Error al eliminar:', err);
     toast(esErrorDeRed(err) ? 'Sin conexión: no se eliminó.' : 'No se pudo eliminar el pedido.', 'error');
@@ -574,6 +816,12 @@ $('#lista-pedidos').addEventListener('change', (e) => {
   }
 });
 $('#lista-pedidos').addEventListener('click', (e) => {
+  const foto = e.target.closest('.pedido-img');
+  if (foto) {
+    const url = urlsFirmadas.get(foto.dataset.ruta)?.url;
+    if (url) window.open(url, '_blank', 'noopener');
+    return;
+  }
   const btn = e.target.closest('[data-accion=borrar]');
   if (btn) borrarPedido(btn.closest('.pedido').dataset.id);
 });
