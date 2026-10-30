@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="Encargá tu torta personalizada en minutos." />
+  <meta name="theme-color" content="#B5546A" />
+  <title>TortaLista · Pedidos de tortas</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+  <!-- Tipografías -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!-- Aviso de conexión -->
+  <div id="offline-banner" class="offline-banner" hidden>
+    Sin conexión · los pedidos se guardan en este dispositivo y se envían solos al volver internet
+  </div>
+
+  <header class="topbar">
+    <a href="#/" class="brand" aria-label="Ir al formulario de pedidos">
+      <span class="brand-logo" aria-hidden="true">🎂</span>
+      <span class="brand-name">TortaLista</span>
+    </a>
+    <nav class="topnav" data-active="cliente">
+      <a href="#/" data-nav="cliente">Encargar</a>
+      <a href="#/admin" data-nav="admin">Panel</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===================== VISTA CLIENTE ===================== -->
+    <section id="view-cliente" class="view" aria-labelledby="titulo-cliente">
+      <div class="hero">
+        <h1 id="titulo-cliente">Encargá tu torta</h1>
+        <p>Completá los datos y te confirmamos por WhatsApp.</p>
+      </div>
+
+      <div id="pending-notice" class="notice notice-warn" hidden></div>
+
+      <form id="form-pedido" class="card form" novalidate>
+        <fieldset>
+          <legend><span class="step">1</span> Tus datos</legend>
+          <div class="grid-2">
+            <label class="field">
+              <span>Nombre y apellido *</span>
+              <input name="cliente_nombre" type="text" autocomplete="name" maxlength="80" required />
+            </label>
+            <label class="field">
+              <span>Teléfono / WhatsApp *</span>
+              <input name="cliente_telefono" type="tel" inputmode="tel" autocomplete="tel" placeholder="264 555 1234" maxlength="25" required />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><span class="step">2</span> Entrega</legend>
+          <div class="grid-2">
+            <label class="field">
+              <span>Fecha de entrega *</span>
+              <input name="fecha" type="date" required />
+            </label>
+            <label class="field">
+              <span>Hora *</span>
+              <input name="hora" type="time" required />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><span class="step">3</span> Tu torta</legend>
+          <label class="field">
+            <span>Temática / diseño *</span>
+            <textarea name="tematica" rows="3" maxlength="500" placeholder="Ej.: Cumple de 5 años, temática dinosaurios, tonos verdes y nombre «Tomi»" required></textarea>
+          </label>
+
+          <div class="field">
+            <span>Sabor del bizcochuelo *</span>
+            <div class="chips" role="radiogroup">
+              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Vainilla" required /><span>Vainilla</span></label>
+              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Chocolate" /><span>Chocolate</span></label>
+              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Marmolado" /><span>Marmolado</span></label>
+              <label class="chip"><input type="radio" name="sabor_bizcocho" value="Red velvet" /><span>Red velvet</span></label>
+            </div>
+          </div>
+
+          <div class="field">
+            <span>Rellenos * <small>(podés elegir varios)</small></span>
+            <div class="chips" id="rellenos">
+              <label class="chip"><input type="checkbox" name="rellenos" value="Dulce de leche" /><span>Dulce de leche</span></label>
+              <label class="chip"><input type="checkbox" name="rellenos" value="Crema chantilly" /><span>Crema chantilly</span></label>
+              <label class="chip"><input type="checkbox" name="rellenos" value="Mousse de chocolate" /><span>Mousse de chocolate</span></label>
+              <label class="chip"><input type="checkbox" name="rellenos" value="Frutillas" /><span>Frutillas</span></label>
+              <label class="chip"><input type="checkbox" name="rellenos" value="Durazno" /><span>Durazno</span></label>
+              <label class="chip"><input type="checkbox" name="rellenos" value="Nutella" /><span>Nutella</span></label>
+              <label class="chip"><input type="checkbox" name="rellenos" value="Oreo" /><span>Oreo</span></label>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>Peso / porciones *</span>
+            <select name="peso_porciones" required>
+              <option value="">Elegí un tamaño…</option>
+              <option>Mini (6–8 porciones)</option>
+              <option>1 kg (10–12 porciones)</option>
+              <option>1½ kg (15–18 porciones)</option>
+              <option>2 kg (20–25 porciones)</option>
+              <option>Más de 2 kg (a consultar)</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend><span class="step">4</span> Pago</legend>
+          <div class="grid-2">
+            <label class="field">
+              <span>Precio total ($) *</span>
+              <input name="precio_total" type="number" inputmode="decimal" min="0" step="0.01" required />
+            </label>
+            <label class="field">
+              <span>Seña abonada ($)</span>
+              <input name="sena" type="number" inputmode="decimal" min="0" step="0.01" value="0" />
+            </label>
+          </div>
+          <div class="field">
+            <span>Medio de la seña</span>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="sena_medio" value="Efectivo" checked /><span>Efectivo</span></label>
+              <label class="chip"><input type="radio" name="sena_medio" value="Mercado Pago" /><span>Mercado Pago</span></label>
+              <label class="chip"><input type="radio" name="sena_medio" value="Transferencia" /><span>Transferencia</span></label>
+            </div>
+          </div>
+          <p class="saldo">Saldo a pagar al retirar: <strong id="saldo">$0</strong></p>
+        </fieldset>
+
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+
+        <button type="submit" class="btn btn-primary btn-block" id="btn-enviar">
+          <span class="btn-label">Enviar pedido</span>
+        </button>
+      </form>
+
+      <div id="pedido-ok" class="card success" hidden>
+        <div class="success-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+        </div>
+        <h2>¡Pedido recibido!</h2>
+        <p id="pedido-ok-texto">Te vamos a contactar para confirmarlo.</p>
+        <button class="btn btn-ghost" id="btn-nuevo">Hacer otro pedido</button>
+      </div>
+    </section>
+
+    <!-- ===================== VISTA ADMIN: LOGIN ===================== -->
+    <section id="view-login" class="view" hidden aria-labelledby="titulo-login">
+      <form id="form-login" class="card form login" novalidate>
+        <h1 id="titulo-login">Panel de la pastelería</h1>
+        <p class="muted">Ingresá con tu cuenta de administrador.</p>
+        <label class="field">
+          <span>Correo</span>
+          <input name="email" type="email" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span>Contraseña</span>
+          <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p id="login-error" class="form-error" role="alert" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="btn-login"><span class="btn-label">Ingresar</span></button>
+      </form>
+    </section>
+
+    <!-- ===================== VISTA ADMIN: PANEL ===================== -->
+    <section id="view-admin" class="view" hidden aria-labelledby="titulo-admin">
+      <div class="admin-head">
+        <div>
+          <h1 id="titulo-admin">Pedidos</h1>
+          <p class="muted"><span id="live-dot" class="live-dot"></span> <span id="live-text">Conectando…</span></p>
+        </div>
+        <div class="admin-actions">
+          <button class="btn btn-ghost btn-sm" id="btn-refrescar" title="Recargar pedidos">↻ Actualizar</button>
+          <button class="btn btn-ghost btn-sm" id="btn-logout">Salir</button>
+        </div>
+      </div>
+
+      <div class="stats" id="stats">
+        <button class="stat" data-estado="Pendiente"><span class="stat-n" id="n-pend">0</span><span>Pendientes</span></button>
+        <button class="stat" data-estado="En Proceso"><span class="stat-n" id="n-proc">0</span><span>En proceso</span></button>
+        <button class="stat" data-estado="Entregado"><span class="stat-n" id="n-entr">0</span><span>Entregados</span></button>
+        <button class="stat stat-alert" data-filtro="urgentes"><span class="stat-n" id="n-urg">0</span><span>Próx. 24 h</span></button>
+      </div>
+
+      <div class="filters card">
+        <input id="f-buscar" type="search" placeholder="Buscar por nombre, teléfono o temática…" aria-label="Buscar" />
+        <select id="f-estado" aria-label="Filtrar por estado">
+          <option value="">Todos los estados</option>
+          <option>Pendiente</option>
+          <option>En Proceso</option>
+          <option>Entregado</option>
+        </select>
+        <select id="f-fecha" aria-label="Filtrar por fecha">
+          <option value="proximos">Próximos (desde hoy)</option>
+          <option value="hoy">Solo hoy</option>
+          <option value="semana">Próximos 7 días</option>
+          <option value="todos">Todos</option>
+        </select>
+      </div>
+
+      <div id="admin-error" class="notice notice-error" hidden></div>
+      <div id="lista-pedidos" class="pedidos" aria-live="polite"></div>
+      <p id="lista-vacia" class="empty" hidden>No hay pedidos con estos filtros.</p>
+    </section>
+  </main>
+
+  <!-- Notificaciones -->
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <!-- Supabase SDK v2 (expone window.supabase) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
