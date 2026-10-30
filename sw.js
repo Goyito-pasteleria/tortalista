@@ -6,15 +6,15 @@
    Al cambiar archivos: subí VERSION acá y el ?v= de style.css y app.js
    (acá y en index.html) al mismo número, así HTML y JS nunca se mezclan.
    ========================================================= */
-const VERSION = 'tortalista-v7';
+const VERSION = 'tortalista-v8';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=7',
-  './app.js?v=7',
+  './style.css?v=8',
+  './app.js?v=8',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

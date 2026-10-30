@@ -14,7 +14,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_hAMx8mm97WgxtbElb1HtIw_Err6Kxbz';
 const TABLA = 'pedidos_tortas';
 const BUCKET = 'referencias';                     // fotos de ejemplo (privado)
 const COLA_KEY = 'tortalista_pedidos_pendientes'; // respaldo local
-const ESTADOS = ['Pendiente', 'En Proceso', 'Entregado'];
+// Pendiente = esperando la seña · Confirmado = la pastelería recibió la seña
+const ESTADOS = ['Pendiente', 'Confirmado', 'En Proceso', 'Entregado'];
 const MAX_RELLENOS = 3;
 
 /* ---------- Tortas listas (catálogo) ----------
@@ -656,6 +657,7 @@ function render() {
 
   // Contadores
   $('#n-pend').textContent = porFecha.filter((p) => p.estado === 'Pendiente').length;
+  $('#n-conf').textContent = porFecha.filter((p) => p.estado === 'Confirmado').length;
   $('#n-proc').textContent = porFecha.filter((p) => p.estado === 'En Proceso').length;
   $('#n-entr').textContent = porFecha.filter((p) => p.estado === 'Entregado').length;
   $('#n-urg').textContent = pedidos.filter(esUrgente).length;
@@ -759,7 +761,20 @@ function tarjeta(p, i = 0) {
       <span class="pill">${conPrecio ? 'Total ' + dinero(p.precio_total) : 'Precio a definir'}</span>
       <span class="pill">Seña ${dinero(p.sena)} · ${esc(p.sena_medio || '—')}</span>
       ${conPrecio ? `<span class="pill ${saldo ? 'pill-saldo' : 'pill-ok'}">${saldo ? 'Saldo ' + dinero(saldo) : 'Pagado'}</span>` : ''}
+      ${p.sena_confirmada_at ? `<span class="pill pill-ok">✓ Seña recibida el ${esc(fmtFecha(p.sena_confirmada_at).dia)}</span>` : ''}
     </div>
+    ${p.estado === 'Pendiente' ? `
+    <div class="confirmar-sena">
+      <p><strong>Esperando la seña.</strong> Cuando la recibas, anotá el monto y confirmá el pedido.</p>
+      <div class="confirmar-fila">
+        <label class="field">
+          <span>Seña recibida ($)</span>
+          <input type="number" inputmode="decimal" min="1" step="0.01" data-campo="sena-recibida" value="${Number(p.sena) > 0 ? esc(p.sena) : ''}" />
+        </label>
+        <button type="button" class="btn btn-sm btn-primary" data-accion="confirmar">✓ Confirmar pedido</button>
+      </div>
+    </div>` : ''}
+    ${p.estado === 'Confirmado' ? `<a class="btn btn-sm btn-ghost btn-wa" href="https://wa.me/${esc(tel)}?text=${encodeURIComponent(`Hola ${p.cliente_nombre}, recibimos tu seña y tu pedido para el ${dia} a las ${hora} h quedó confirmado. ¡Gracias! Goyito Pastelería`)}" target="_blank" rel="noopener">💬 Avisar al cliente por WhatsApp</a>` : ''}
     <div class="pedido-acciones">
       <select class="sel-estado sel-${claseEstado.slice(4)}" data-accion="estado" aria-label="Estado del pedido">
         ${ESTADOS.map((e) => `<option ${e === p.estado ? 'selected' : ''}>${e}</option>`).join('')}
@@ -787,6 +802,38 @@ async function cambiarEstado(id, nuevo, selectEl) {
   }
 }
 
+/** El dueño confirma que recibió la seña: guarda el monto y pasa el pedido a "Confirmado". */
+async function confirmarSena(id, btn) {
+  const card = btn.closest('.pedido');
+  const input = card.querySelector('[data-campo=sena-recibida]');
+  const monto = Number(input.value);
+  if (!(monto > 0)) {
+    input.classList.add('invalid');
+    input.focus();
+    toast('Anotá el monto de la seña recibida.', 'warn', 3000);
+    return;
+  }
+  const p = pedidos.find((x) => x.id === id);
+  if (p?.precio_total != null && monto > Number(p.precio_total)) {
+    input.classList.add('invalid');
+    toast('La seña no puede superar el precio total.', 'warn', 3000);
+    return;
+  }
+  btn.disabled = true;
+  const cambios = { estado: 'Confirmado', sena: monto, sena_confirmada_at: new Date().toISOString() };
+  try {
+    const { error } = await sb.from(TABLA).update(cambios).eq('id', id);
+    if (error) throw error;
+    pedidos = pedidos.map((x) => (x.id === id ? { ...x, ...cambios } : x));
+    render();
+    toast(`✓ Pedido de ${p?.cliente_nombre || 'cliente'} confirmado`, 'ok');
+  } catch (err) {
+    console.error('Error al confirmar la seña:', err);
+    btn.disabled = false;
+    toast(esErrorDeRed(err) ? 'Sin conexión: el pedido no se confirmó.' : 'No se pudo confirmar el pedido.', 'error');
+  }
+}
+
 async function borrarPedido(id) {
   const p = pedidos.find((x) => x.id === id);
   if (!confirm(`¿Eliminar definitivamente el pedido de ${p?.cliente_nombre || 'este cliente'}?`)) return;
@@ -810,6 +857,7 @@ async function borrarPedido(id) {
 }
 
 // Delegación de eventos en la lista
+$('#lista-pedidos').addEventListener('input', (e) => e.target.classList?.remove('invalid'));
 $('#lista-pedidos').addEventListener('change', (e) => {
   if (e.target.dataset.accion === 'estado') {
     cambiarEstado(e.target.closest('.pedido').dataset.id, e.target.value, e.target);
@@ -820,6 +868,11 @@ $('#lista-pedidos').addEventListener('click', (e) => {
   if (foto) {
     const url = urlsFirmadas.get(foto.dataset.ruta)?.url;
     if (url) window.open(url, '_blank', 'noopener');
+    return;
+  }
+  const conf = e.target.closest('[data-accion=confirmar]');
+  if (conf) {
+    confirmarSena(conf.closest('.pedido').dataset.id, conf);
     return;
   }
   const btn = e.target.closest('[data-accion=borrar]');

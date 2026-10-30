@@ -365,6 +365,7 @@ form[data-tipo="Lista"] .solo-personalizada { display: none; }
   transition: opacity var(--dur-exit) var(--ease-out), transform var(--dur-exit) var(--ease-out);
 }
 .pedido.est-Pendiente { border-left-color: var(--warn); }
+.pedido.est-Confirmado { border-left-color: var(--primary); }
 .pedido.est-EnProceso { border-left-color: var(--info); }
 .pedido.est-Entregado { border-left-color: var(--ok); opacity: .82; }
 .pedido.urgente { box-shadow: 0 0 0 2px var(--primary-soft), var(--shadow); }
@@ -409,6 +410,7 @@ form[data-tipo="Lista"] .solo-personalizada { display: none; }
 .pedido-acciones { display: flex; gap: .5rem; align-items: center; border-top: 1px dashed var(--line); padding-top: .7rem; }
 .pedido-acciones select { flex: 1; min-height: 42px; padding: .5rem .7rem; font-weight: 700; }
 .sel-Pendiente { background: var(--warn-soft); }
+.sel-Confirmado { background: var(--primary-soft); }
 .sel-EnProceso { background: var(--info-soft); }
 .sel-Entregado { background: var(--ok-soft); }
 
@@ -444,7 +446,7 @@ form[data-tipo="Lista"] .solo-personalizada { display: none; }
 @media (min-width: 640px) {
   .grid-2 { grid-template-columns: 1fr 1fr; }
   .form { padding: 1.75rem 2rem; }
-  .stats { grid-template-columns: repeat(4, 1fr); }
+  .stats { grid-template-columns: repeat(5, 1fr); }
   .catalogo { grid-template-columns: repeat(3, 1fr); }
   .torta-card { grid-template-columns: 1fr; text-align: center; padding: .8rem .8rem 1rem; }
   .torta-foto { width: 100%; height: 120px; font-size: 3rem; }
@@ -466,3 +468,11 @@ form[data-tipo="Lista"] .solo-personalizada { display: none; }
   .skeleton { animation: none; }
   .success-icon path { animation: none; stroke-dashoffset: 0; }
 }
+
+/* Confirmación de seña (panel) */
+.confirmar-sena { background: var(--warn-soft); border-radius: var(--radius-sm); padding: .75rem .85rem; display: grid; gap: .55rem; }
+.confirmar-sena p { margin: 0; font-size: .9rem; color: var(--cocoa); }
+.confirmar-fila { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; }
+.confirmar-fila .field { flex: 1 1 140px; margin: 0; }
+.confirmar-fila .btn { flex: 0 0 auto; min-height: 44px; }
+.btn-wa { justify-self: start; text-decoration: none; }
