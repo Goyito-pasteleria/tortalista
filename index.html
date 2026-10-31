@@ -6,6 +6,9 @@
   <meta name="description" content="Encargá tu torta personalizada en minutos." />
   <meta name="theme-color" content="#B5546A" />
   <title>TortaLista · Pedidos de tortas</title>
+  <!-- Seguridad: solo se cargan scripts y conexiones de los sitios que usa la app -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://naewanjjdevhsstenjja.supabase.co; connect-src 'self' data: https://naewanjjdevhsstenjja.supabase.co wss://naewanjjdevhsstenjja.supabase.co https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
 
   <!-- PWA -->
   <link rel="manifest" href="./manifest.json" />
@@ -19,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="./style.css?v=9" />
+  <link rel="stylesheet" href="./style.css?v=10" />
 </head>
 <body>
   <!-- Aviso de conexión -->
@@ -172,6 +175,11 @@
           <p class="saldo">El precio final te lo confirma Goyito Pastelería por WhatsApp.</p>
         </fieldset>
 
+        <!-- Honeypot anti-bots: invisible para las personas, no completar -->
+        <div class="trampa" aria-hidden="true">
+          <label>No completar <input name="empresa_web" type="text" tabindex="-1" autocomplete="off" /></label>
+        </div>
+
         <p id="form-error" class="form-error" role="alert" hidden></p>
 
         <button type="submit" class="btn btn-primary btn-block" id="btn-enviar">
@@ -256,7 +264,7 @@
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
   <!-- Supabase SDK v2 (expone window.supabase) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
-  <script src="./app.js?v=9"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+  <script src="./app.js?v=10"></script>
 </body>
 </html>

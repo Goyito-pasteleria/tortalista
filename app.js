@@ -199,20 +199,41 @@ async function insertarPedido(pedido) {
   if (error && error.code !== '23505') throw error;
 }
 
-/** Sube la foto de ejemplo al bucket privado. Devuelve la ruta guardada. */
+const rutaImagen = (pedidoId) => `${pedidoId}/referencia.jpg`;
+
+/** Sube la foto de ejemplo al bucket privado. */
 async function subirImagen(pedidoId, blob) {
   if (!sb) throw new Error('network: Supabase no disponible');
-  const ruta = `${pedidoId}/referencia.jpg`;
-  const { error } = await sb.storage.from(BUCKET).upload(ruta, blob, { contentType: 'image/jpeg', upsert: false });
+  const { error } = await sb.storage.from(BUCKET).upload(rutaImagen(pedidoId), blob, { contentType: 'image/jpeg', upsert: false });
   // "Ya existe" → se había subido en un intento previo
   if (error && !/exist|duplicate/i.test(error.message || '') && String(error.statusCode) !== '409') throw error;
-  return ruta;
 }
 
-/** Envía un pedido completo: primero la foto (si hay) y después los datos. */
+/**
+ * Envía un pedido completo: primero los datos y después la foto (si hay).
+ * La base solo acepta la foto si ya existe el pedido que la espera.
+ * Devuelve 'ok', o 'sin-imagen' si el pedido entró pero la foto fue rechazada.
+ */
 async function enviarPedidoCompleto(pedido, blob) {
-  if (blob) pedido.imagen_path = await subirImagen(pedido.id, blob);
+  pedido.imagen_path = blob ? rutaImagen(pedido.id) : null;
   await insertarPedido(pedido);
+  if (!blob) return 'ok';
+  try {
+    await subirImagen(pedido.id, blob);
+  } catch (err) {
+    if (esErrorDeRed(err)) throw err; // se reintenta desde la cola (el pedido repetido se ignora)
+    console.warn('El pedido se guardó, pero la foto no:', err);
+    return 'sin-imagen';
+  }
+  return 'ok';
+}
+
+/** Límites anti-spam de la base (ver supabase-actualizacion-5.sql) */
+function mensajeLimite(err) {
+  const msg = String(err?.message || '');
+  if (msg.includes('TL_LIMITE_TELEFONO')) return 'Ya recibimos varios pedidos desde este teléfono en la última hora. Esperá un rato o escribinos por WhatsApp.';
+  if (msg.includes('TL_LIMITE_GLOBAL')) return 'Estamos recibiendo muchos pedidos en este momento. Probá de nuevo en unos minutos.';
+  return null;
 }
 
 let sincronizando = false;
@@ -446,14 +467,25 @@ form.addEventListener('submit', async (e) => {
   // La foto solo aplica a tortas personalizadas
   const blob = pedido.tipo === 'Personalizada' ? imagenBlob : null;
 
-  try {
-    await enviarPedidoCompleto(pedido, blob);
+  // Honeypot: campo invisible que solo completan los bots → se simula el envío y no se manda nada
+  if (form.empresa_web.value) {
     mostrarExito('Ya lo recibimos. Te vamos a escribir por WhatsApp para confirmarlo.');
+    btn.disabled = false;
+    setLabel(btn, 'Enviar pedido');
+    return;
+  }
+
+  try {
+    const resultado = await enviarPedidoCompleto(pedido, blob);
+    mostrarExito(
+      resultado === 'sin-imagen'
+        ? 'Ya lo recibimos, pero la imagen de ejemplo no se pudo guardar: mandala por WhatsApp cuando te escribamos.'
+        : 'Ya lo recibimos. Te vamos a escribir por WhatsApp para confirmarlo.'
+    );
     toast('✓ Pedido enviado', 'ok');
   } catch (err) {
     if (esErrorDeRed(err)) {
       // Respaldo automático: no se pierde el pedido
-      delete pedido.imagen_path; // se vuelve a subir al sincronizar
       let dataUrl = null;
       try { if (blob) dataUrl = await blobADataUrl(blob); } catch { dataUrl = null; }
       const guardado = encolar(pedido, dataUrl);
@@ -467,7 +499,7 @@ form.addEventListener('submit', async (e) => {
       }
     } else {
       console.error('Error al insertar pedido:', err);
-      errorEl.textContent = 'No pudimos registrar el pedido. Revisá los datos e intentá otra vez.';
+      errorEl.textContent = mensajeLimite(err) || 'No pudimos registrar el pedido. Revisá los datos e intentá otra vez.';
       errorEl.hidden = false;
       toast('Error al enviar el pedido', 'error');
     }
@@ -678,6 +710,7 @@ function render() {
 
 /* ---------- Fotos de ejemplo en el panel (URLs firmadas, el bucket es privado) ---------- */
 const urlsFirmadas = new Map(); // ruta → { url, vence }
+const fotosFaltantes = new Set(); // rutas sin archivo en el bucket
 
 async function cargarMiniaturas() {
   const botones = $$('.pedido-img[data-ruta]');
@@ -689,13 +722,17 @@ async function cargarMiniaturas() {
       const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(faltan, 3600);
       if (error) throw error;
       (data || []).forEach((d) => {
-        if (d.signedUrl) urlsFirmadas.set(d.path, { url: d.signedUrl, vence: ahora + 55 * 60 * 1000 });
+        if (d.signedUrl) {
+          urlsFirmadas.set(d.path, { url: d.signedUrl, vence: ahora + 55 * 60 * 1000 });
+          fotosFaltantes.delete(d.path);
+        } else if (d.path) fotosFaltantes.add(d.path); // el pedido entró pero la foto no llegó a subirse
       });
     } catch (err) {
       console.error('No se pudieron cargar las imágenes:', err);
     }
   }
   botones.forEach((b) => {
+    if (fotosFaltantes.has(b.dataset.ruta)) b.hidden = true;
     const url = urlsFirmadas.get(b.dataset.ruta)?.url;
     const img = b.querySelector('img');
     if (url && img && !img.src) {
