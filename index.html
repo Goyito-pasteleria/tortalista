@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="./style.css?v=10" />
+  <link rel="stylesheet" href="./style.css?v=11" />
 </head>
 <body>
   <!-- Aviso de conexión -->
@@ -43,15 +43,16 @@
 
   <main>
     <!-- ===================== VISTA CLIENTE ===================== -->
-    <section id="view-cliente" class="view" aria-labelledby="titulo-cliente">
+    <section id="view-cliente" class="view" data-modo="online" aria-labelledby="titulo-cliente">
       <div class="hero">
         <h1 id="titulo-cliente">Encargá tu torta</h1>
-        <p>Completá los datos y te confirmamos por WhatsApp.</p>
+        <p id="hero-sub">Completá los datos y te confirmamos por WhatsApp.</p>
+        <a href="#/admin" class="btn btn-ghost btn-sm solo-presencial-hero">← Volver al panel</a>
       </div>
 
       <div id="pending-notice" class="notice notice-warn" hidden></div>
 
-      <form id="form-pedido" class="card form" data-tipo="Personalizada" novalidate>
+      <form id="form-pedido" class="card form" data-tipo="Personalizada" data-medio="Transferencia" novalidate>
         <fieldset>
           <legend><span class="step">1</span> Tus datos</legend>
           <div class="grid-2">
@@ -125,15 +126,9 @@
 
           <div class="field solo-personalizada">
             <span>Rellenos * <small id="rellenos-contador">(hasta 3)</small></span>
-            <div class="chips" id="rellenos">
-              <label class="chip"><input type="checkbox" name="rellenos" value="Dulce de leche" /><span>Dulce de leche</span></label>
-              <label class="chip"><input type="checkbox" name="rellenos" value="Crema chantilly" /><span>Crema chantilly</span></label>
-              <label class="chip"><input type="checkbox" name="rellenos" value="Mousse de chocolate" /><span>Mousse de chocolate</span></label>
-              <label class="chip"><input type="checkbox" name="rellenos" value="Frutillas" /><span>Frutillas</span></label>
-              <label class="chip"><input type="checkbox" name="rellenos" value="Durazno" /><span>Durazno</span></label>
-              <label class="chip"><input type="checkbox" name="rellenos" value="Nutella" /><span>Nutella</span></label>
-              <label class="chip"><input type="checkbox" name="rellenos" value="Oreo" /><span>Oreo</span></label>
-            </div>
+            <div class="chips" id="rellenos"></div>
+            <!-- Para los rellenos con variantes (ej. ganache blanco / semi amargo / con leche) -->
+            <div class="variantes" id="rellenos-variantes"></div>
           </div>
 
           <label class="field">
@@ -156,23 +151,42 @@
 
         <fieldset>
           <legend><span class="step">4</span> Seña para confirmar</legend>
-          <div class="aviso-sena">
+          <div class="aviso-sena solo-online">
             <span aria-hidden="true">💰</span>
-            <p>Para que <strong>Goyito Pastelería</strong> confirme tu pedido y lo pueda realizar, es necesario abonar una <strong>seña</strong>. Hasta recibirla, el pedido queda pendiente de confirmación.</p>
+            <p>Para que <strong>Goyito Pastelería</strong> confirme tu pedido, transferí una <strong>seña de al menos <span class="sena-minima"></span></strong> y subí el comprobante. Hasta verificar la transferencia, el pedido queda pendiente de confirmación.</p>
           </div>
-          <label class="field">
-            <span>Seña ($)</span>
-            <input name="sena" type="number" inputmode="decimal" min="0" step="0.01" value="0" />
-          </label>
-          <div class="field">
-            <span>Medio de la seña</span>
-            <div class="chips">
+
+          <div class="datos-transferencia solo-online" id="datos-transferencia"></div>
+
+          <div class="field solo-presencial">
+            <span>Medio de la seña *</span>
+            <div class="chips" id="sena-medio">
               <label class="chip"><input type="radio" name="sena_medio" value="Efectivo" checked /><span>Efectivo</span></label>
-              <label class="chip"><input type="radio" name="sena_medio" value="Mercado Pago" /><span>Mercado Pago</span></label>
               <label class="chip"><input type="radio" name="sena_medio" value="Transferencia" /><span>Transferencia</span></label>
             </div>
           </div>
-          <p class="saldo">El precio final te lo confirma Goyito Pastelería por WhatsApp.</p>
+
+          <label class="field">
+            <span><span class="solo-online">Monto que transferiste ($) *</span><span class="solo-presencial">Seña recibida ($) *</span> <small>(mínimo <span class="sena-minima"></span>)</small></span>
+            <input name="sena" type="number" inputmode="decimal" min="10000" step="0.01" required />
+          </label>
+
+          <div class="field solo-transferencia">
+            <span>Comprobante de la transferencia <small class="solo-online">*</small><small class="solo-presencial">(opcional)</small></span>
+            <input id="comprobante" type="file" accept="image/*,application/pdf" class="visually-hidden" />
+            <label for="comprobante" class="upload" id="comprobante-zona">
+              <span class="upload-icon" aria-hidden="true">🧾</span>
+              <span><strong>Subí el comprobante</strong> (captura o PDF)</span>
+              <small>Foto, captura de pantalla o PDF · máx. 5 MB</small>
+            </label>
+            <div class="upload-preview" id="comprobante-preview" hidden>
+              <img id="comprobante-img" alt="Vista previa del comprobante" hidden />
+              <span class="comprobante-pdf" id="comprobante-pdf" hidden></span>
+              <button type="button" class="btn btn-sm btn-ghost" id="comprobante-quitar">Quitar comprobante</button>
+            </div>
+          </div>
+
+          <p class="saldo solo-online">El precio final te lo confirma Goyito Pastelería por WhatsApp.</p>
         </fieldset>
 
         <!-- Honeypot anti-bots: invisible para las personas, no completar -->
@@ -193,8 +207,11 @@
         </div>
         <h2>¡Pedido recibido!</h2>
         <p id="pedido-ok-texto">Te vamos a contactar para confirmarlo.</p>
-        <p class="ok-sena">Recordá que Goyito Pastelería confirma el pedido cuando recibe la seña.</p>
-        <button class="btn btn-ghost" id="btn-nuevo">Hacer otro pedido</button>
+        <p class="ok-sena" id="ok-sena">Goyito Pastelería revisa la transferencia y te confirma el pedido por WhatsApp.</p>
+        <div class="success-acciones">
+          <button class="btn btn-ghost" id="btn-nuevo">Hacer otro pedido</button>
+          <a href="#/admin" class="btn btn-primary" id="btn-volver-panel" hidden>Volver al panel</a>
+        </div>
       </div>
     </section>
 
@@ -224,6 +241,7 @@
           <p class="muted"><span id="live-dot" class="live-dot"></span> <span id="live-text">Conectando…</span></p>
         </div>
         <div class="admin-actions">
+          <a href="#/admin/nuevo" class="btn btn-primary btn-sm" id="btn-presencial">+ Pedido presencial</a>
           <button class="btn btn-ghost btn-sm" id="btn-refrescar" title="Recargar pedidos">↻ Actualizar</button>
           <button class="btn btn-ghost btn-sm" id="btn-logout">Salir</button>
         </div>
@@ -265,6 +283,6 @@
 
   <!-- Supabase SDK v2 (expone window.supabase) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-  <script src="./app.js?v=10"></script>
+  <script src="./app.js?v=11"></script>
 </body>
 </html>
