@@ -214,6 +214,8 @@ form[data-tipo="Lista"] .solo-personalizada { display: none; }
 
 /* Catálogo de tortas listas */
 .catalogo { display: grid; grid-template-columns: 1fr; gap: .75rem; }
+.catalogo-grupo { grid-column: 1 / -1; margin: .4rem 0 -.2rem; font-weight: 800; color: var(--cocoa); }
+.catalogo-grupo:first-child { margin-top: 0; }
 .catalogo.invalid { border-radius: var(--radius); padding: .4rem; }
 .torta { position: relative; cursor: pointer; display: block; }
 .torta input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }

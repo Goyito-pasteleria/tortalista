@@ -22,38 +22,25 @@ const MAX_RELLENOS = 3;
    Para cambiar el catálogo, editá esta lista:
    - precio: número (ej. 28000) para mostrar "Desde $..." como referencia, o null para no mostrarlo
      (el precio final siempre lo define la pastelería)
-   - imagen: ruta de una foto (ej. './img/oreo.jpg') o null para usar el emoji */
+   - imagen: ruta de una foto (ej. './img/oreo.jpg') o null para usar el emoji
+   - sabor: 'Chocolate' o 'Vainilla' (la base de datos solo acepta esos dos) · rellenos: máximo 3 */
 const TORTAS_LISTAS = [
-  {
-    id: 'oreo',
-    nombre: 'Torta Oreo',
-    descripcion: 'Bizcochuelo de chocolate, crema y galletitas Oreo.',
-    sabor: 'Chocolate',
-    rellenos: ['Crema', 'Oreo'],
-    emoji: '🍪',
-    precio: null,
-    imagen: null,
-  },
-  {
-    id: 'selva-negra',
-    nombre: 'Selva Negra',
-    descripcion: 'Chocolate, crema chantilly y cerezas.',
-    sabor: 'Chocolate',
-    rellenos: ['Crema chantilly', 'Cerezas'],
-    emoji: '🍒',
-    precio: null,
-    imagen: null,
-  },
-  {
-    id: 'frutilla',
-    nombre: 'Torta de frutilla',
-    descripcion: 'Vainilla, crema chantilly y frutillas frescas.',
-    sabor: 'Vainilla',
-    rellenos: ['Crema chantilly', 'Frutillas'],
-    emoji: '🍓',
-    precio: null,
-    imagen: null,
-  },
+  // De chocolate
+  { id: 'selva-negra', nombre: 'Selva Negra', descripcion: 'Crema de leche con cerezas y ganache de chocolate.',
+    sabor: 'Chocolate', rellenos: ['Crema de leche', 'Cerezas', 'Ganache de chocolate'], emoji: '🍒', precio: null, imagen: null },
+  { id: 'oreo', nombre: 'Oreo', descripcion: 'Crema de leche con galletitas Oreo y dulce de leche.',
+    sabor: 'Chocolate', rellenos: ['Crema de leche', 'Galletitas Oreo', 'Dulce de leche'], emoji: '🍪', precio: null, imagen: null },
+  { id: 'bariloche', nombre: 'Bariloche', descripcion: 'Crema de leche con frutillas y crema Bariloche.',
+    sabor: 'Chocolate', rellenos: ['Crema de leche', 'Frutillas', 'Crema Bariloche'], emoji: '🍫', precio: null, imagen: null },
+  // De vainilla
+  { id: 'chaja', nombre: 'Chajá', descripcion: 'Crema con duraznos y dulce de leche con nuez.',
+    sabor: 'Vainilla', rellenos: ['Crema', 'Duraznos', 'Dulce de leche con nuez'], emoji: '🍑', precio: null, imagen: null },
+  { id: 'frutillas', nombre: 'Frutillas', descripcion: 'Crema de leche con frutillas y dulce de leche con chips.',
+    sabor: 'Vainilla', rellenos: ['Crema de leche', 'Frutillas', 'Dulce de leche con chips'], emoji: '🍓', precio: null, imagen: null },
+  { id: 'frutal', nombre: 'Frutal', descripcion: 'Crema con duraznos y crema con frutillas.',
+    sabor: 'Vainilla', rellenos: ['Crema con duraznos', 'Crema con frutillas'], emoji: '🍰', precio: null, imagen: null },
+  { id: 'moka', nombre: 'Moka', descripcion: 'Crema moka y dulce de leche.',
+    sabor: 'Vainilla', rellenos: ['Crema moka', 'Dulce de leche'], emoji: '☕', precio: null, imagen: null },
 ];
 
 /* ---------- 2. Cliente Supabase (defensivo) ---------- */
@@ -277,7 +264,15 @@ function prepararFormulario() {
 }
 
 function renderCatalogo() {
-  $('#catalogo').innerHTML = TORTAS_LISTAS.map((t) => `
+  // Agrupado por bizcochuelo: "De chocolate" / "De vainilla"
+  $('#catalogo').innerHTML = ['Chocolate', 'Vainilla'].map((sabor) => {
+    const tortas = TORTAS_LISTAS.filter((t) => t.sabor === sabor);
+    return tortas.length ? `<p class="catalogo-grupo">De ${sabor.toLowerCase()}</p>` + tortas.map(tortaCatalogo).join('') : '';
+  }).join('');
+}
+
+function tortaCatalogo(t) {
+  return `
     <label class="torta">
       <input type="radio" name="torta_lista" value="${esc(t.id)}" />
       <div class="torta-card">
@@ -289,7 +284,7 @@ function renderCatalogo() {
         </div>
       </div>
       <span class="torta-check" aria-hidden="true">✓</span>
-    </label>`).join('');
+    </label>`;
 }
 
 function cambiarTipo(tipo) {
